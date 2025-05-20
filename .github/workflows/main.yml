@@ -371,3 +371,72 @@ jobs:
     - name: build-iOS
       if: success()
       run: ./build-ios.sh
+
+  Linux_amd64:
+    runs-on: ubuntu-latest
+    strategy:
+        fail-fast: true
+        matrix:
+            build_type: [Release]
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: true
+
+    - name: Build with Docker
+      run: |
+        docker build \
+            --build-arg BUILD_TYPE=${{matrix.build_type}} \
+            -t simple-builder -f Dockerfile .
+
+        mkdir -p ${{ github.workspace }}/build_output
+        BUILDER_CID=$(docker create simple-builder)
+        
+        # Copy the contents of /output from the container to the host's build_output directory
+        # The Dockerfile places artifacts in /output/libsimple-linux-amd64/
+        # Using "/output/." copies the contents of /output (i.e., the libsimple-linux-amd64 directory itself)
+        # into ${{ github.workspace }}/build_output/
+        docker cp "${BUILDER_CID}:/output/." "${{ github.workspace }}/build_output/"
+        
+        # Clean up (remove) the temporary container
+        docker rm "${BUILDER_CID}"
+
+
+    - name: check file
+      run: |
+        mkdir -p ${{ github.workspace }}/build_output
+        echo "=== Directory structure ==="
+        find ${{ github.workspace }}/build_output -type f | sort
+        echo "=== Docker container output ==="
+        docker run --rm simple-builder ls -la /output
+
+    - name: Check file existence
+      uses: andstor/file-existence-action@v3
+      with:
+        allow_failure: true
+        files: "${{ github.workspace }}/build_output/libsimple-linux-amd64/libsimple.so, ${{ github.workspace }}/build_output/libsimple-linux-amd64/dict/jieba.dict.utf8"
+    
+    - name: Package
+      if: startsWith(github.ref, 'refs/tags/')
+      run: |
+        cd build_output
+        zip -r libsimple-linux-amd64.zip libsimple-linux-amd64
+        working-directory: "${{ github.workspace }}"
+
+    - name: Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        draft: true
+        files: "${{ github.workspace }}/build_output/libsimple-linux-amd64.zip"
+        env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build Summary (amd64)
+      if: always()
+      run: |
+        echo "## Build Summary (amd64)" >> $GITHUB_STEP_SUMMARY
+        echo "- Build Type: ${{ matrix.build_type }}" >> $GITHUB_STEP_SUMMARY
+        echo "- OS: Linux (amd64) with Docker" >> $GITHUB_STEP_SUMMARY
