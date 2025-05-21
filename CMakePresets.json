@@ -107,6 +107,39 @@
         "lhs": "${hostSystemName}",
         "rhs": "Windows"
       }
+    },
+    {
+      "name": "alpine-docker-release",
+      "displayName": "Alpine Linux Release",
+      "description": "Configure for Alpine Linux (musl libc) release build within Docker.",
+      "binaryDir": "${sourceDir}/build",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": {
+          "type": "FILEPATH",
+          "value": "${sourceDir}/toolchain-alpine.cmake"
+        },
+        "CMAKE_BUILD_TYPE": {
+          "type": "STRING",
+          "value": "Release"
+        },
+        "BUILD_SHELL": {
+          "type": "BOOL",
+          "value": "OFF"
+        },
+        "BUILD_TEST_EXAMPLE": {
+          "type": "BOOL",
+          "value": "OFF"
+        },
+        "BUILD_SQLITE3": {
+          "type": "BOOL",
+          "value": "ON"
+        },
+        "SQLITE_ENABLE_FTS5": {
+          "type": "BOOL",
+          "value": "ON"
+        }
+      }
     }
   ],
   "buildPresets": [
@@ -147,6 +180,13 @@
       "configurePreset": "windows-msvc-vs17",
       "displayName": "Build Windows VS17 (Release)",
       "description": "Build with VS17 (Release)",
+      "configuration": "Release"
+    },
+    {
+      "name": "alpine-docker-release",
+      "configurePreset": "alpine-docker-release",
+      "displayName": "Build Alpine Linux (Release)",
+      "description": "Build shared library for Alpine Linux (musl libc) in release mode.",
       "configuration": "Release"
     }
   ]

@@ -1,0 +1,30 @@
+FROM alpine:latest
+ARG BUILD_TYPE=Release
+
+RUN apk update && apk add --no-cache \
+    build-base \
+    cmake \
+    ninja-build \
+    git \
+    wget \
+    curl \
+    zip \
+    unzip \
+    tar \
+    sqlite-dev \
+    ncurses-dev \
+    linux-headers
+
+ENV PATH="/usr/lib/ninja-build/bin:$PATH"
+
+WORKDIR /app
+COPY . .
+
+RUN mkdir build
+RUN cmake --preset alpine-docker-release
+RUN cd build && cmake --build . -j "$(nproc)"
+
+RUN mkdir -p /output/libsimple-alpine-amd64
+RUN ls /app/build/src/
+RUN cp /app/build/src/libsimple.so /output/libsimple-alpine-amd64/
+RUN cp -r /app/build/test/dict /output/libsimple-alpine-amd64/
