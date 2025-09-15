@@ -17,118 +17,6 @@ permissions:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # Windows:
-  #   runs-on: windows-latest
-  #   needs: Linux
-  #   strategy:
-  #     fail-fast: true
-  #     matrix:
-  #       include:
-  #       - arch: x86
-  #       - arch: x64
-  #       - arch: arm64
-
-  #   steps:
-  #   - name: "Set Build Type"
-  #     id: build_type
-  #     shell: pwsh
-  #     run: |
-  #       if ("${{ github.ref }}".StartsWith("refs/tags/")) {
-  #         echo "BUILD_TYPE=Release" >> $env:GITHU B_OUTPUT
-  #       } else {
-  #         echo "BUILD_TYPE=Debug" >> $env:GITHUB_OUTPUT
-  #       }
-
-  #       if ("${{ matrix.arch }}" -eq "x64") {
-  #         echo "Arch:x64";
-  #         echo "::set-output name=BUILD_ARCH::x64";
-  #       } elseif ("${{ matrix.arch }}" -eq "arm64") {
-  #         echo "Arch:ARM64";
-  #         echo "::set-output name=BUILD_ARCH::ARM64";
-  #       } else {
-  #         echo "Arch:Win32";
-  #         echo "::set-output name=BUILD_ARCH::Win32";
-  #       }
-        
-
-  #   # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-  #   - uses: actions/checkout@v4
-  #     with:
-  #       submodules: true
-
-  #   # - name: Install MSVC problem matcher
-  #   #   uses: ammaraskar/msvc-problem-matcher@master
-
-  #   # Install latest CMake
-  #   - uses: lukka/get-cmake@v3.31.6
-
-  #   # Restore from cache the previously built ports
-  #   - name: Restore artifacts, or setup vcpkg
-  #     uses: lukka/run-vcpkg@v10
-  #     with:
-  #       vcpkgDirectory: '${{ github.workspace }}/vcpkg'
-
-  #   # Add this to prevent storing partial cache in case of failure
-  #   - run: |
-  #       echo "RUNVCPKG_NO_CACHE=1" >> $GITHUB_ENV
-  #     if: ${{ failure() || cancelled() }}
-  #     shell: bash
-
-  #   - name: 'Run CMake'
-  #     uses: lukka/run-cmake@v10
-  #     continue-on-error: false
-  #     with:
-  #       configurePreset: 'windows-msvc-vs17'
-  #       buildPreset: ${{ startsWith(github.ref, 'refs/tags/') && 'windows-msvc-vs17-release' || 'windows-msvc-vs17' }}
-
-  #   - name: "Check file existence"
-  #     uses: andstor/file-existence-action@v3
-  #     with:
-  #       allow_failure: true
-  #       files: "${{ github.workspace }}/../../_temp/windows/src/${{ steps.build_type.outputs.BUILD_TYPE }}/simple.dll, ${{ github.workspace }}/../../_temp/windows/cppjieba/src/cppjieba/dict/jieba.dict.utf8"
-
-  #   # can't build
-  #   # npm run
-  #   # - uses: actions/setup-node@v2
-  #   #   with:
-  #   #     node-version: '16'
-  #   # - name: run node example
-  #   #   working-directory: ./examples/node/
-  #   #   run: |
-  #   #     npm install
-  #   #     npm run p -- --ext_path="${{ github.workspace }}/../../_temp/windows/src/${{ steps.build_type.outputs.BUILD_TYPE }}/" --dict_path="${{ github.workspace }}/../../_temp/windows/cppjieba/src/cppjieba/dict/"
-
-  #   # - name: 'Run CTest'
-  #   #   run: ctest -C ${{ env.BUILD_TYPE }}
-  #   #   working-directory: "${{ github.workspace }}/../../_temp/windows"
-
-  #   # python run
-  #   # - uses: actions/setup-python@v4
-  #   #   with:
-  #   #     python-version: '3.x' # Version range or exact version of a Python version to use, using SemVer's version range syntax
-  #   # - name: run python example
-  #   #   working-directory: ./examples/python3/
-  #   #   run: python db_connector.py "${{ github.workspace }}/../../_temp/windows/src/${{ steps.build_type.outputs.BUILD_TYPE }}/simple"
-
-  #   - name: Package
-  #     if: startsWith(github.ref, 'refs/tags/')
-  #     run: |
-  #       $outputDir = "$env:GITHUB_WORKSPACE\artifacts"
-  #       New-Item -ItemType Directory -Path $outputDir -Force
-  #       mkdir libsimple-windows-${{ matrix.arch }}
-  #       Copy-Item -Path src/${{ steps.build_type.outputs.BUILD_TYPE }}/simple.dll,cppjieba/src/cppjieba/dict/ -Destination libsimple-windows-${{ matrix.arch }}/ -Recurse
-  #       Compress-Archive -Path libsimple-windows-${{ matrix.arch }} -DestinationPath "$outputDir\libsimple-windows-${{ matrix.arch }}.zip"
-  #     working-directory: "${{ github.workspace }}/../../_temp/windows/"
-  #   - name: Release
-  #     if: startsWith(github.ref, 'refs/tags/')
-  #     uses: softprops/action-gh-release@v2
-  #     with:
-  #       draft: true
-  #       files: "${{ github.workspace }}/artifacts/libsimple-windows-${{ matrix.arch }}.zip"
-  #     env:
-  #       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #       BUILD_TYPE: ${{ github.ref_type == 'tag' && 'Release' || 'Debug' }}
-
   Linux:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -246,19 +134,29 @@ jobs:
       uses: mikepenz/release-changelog-builder-action@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Set architecture suffix
+      run: |
+        if [[ "${{ matrix.os }}" == "ubuntu-24.04" ]]; then
+          echo "ARCH_SUFFIX=amd64" >> $GITHUB_ENV
+        elif [[ "${{ matrix.os }}" == "ubuntu-24.04-arm" ]]; then
+          echo "ARCH_SUFFIX=arm64" >> $GITHUB_ENV
+        fi
+
     - name: Package
       if: startsWith(github.ref, 'refs/tags/')
       run: |
-        mkdir libsimple-linux-${{ matrix.os }}
-        cp -r src/libsimple.so test/dict/ libsimple-linux-${{ matrix.os }}/
-        zip -r libsimple-linux-${{ matrix.os }}.zip libsimple-linux-${{ matrix.os }}
+        mkdir libsimple-ubuntu-24.04-${{ env.ARCH_SUFFIX }}
+        cp -r src/libsimple.so test/dict/ libsimple-ubuntu-24.04-${{ env.ARCH_SUFFIX }}/
+        tar -czf libsimple-ubuntu-24.04-${{ env.ARCH_SUFFIX }}.tar.gz libsimple-ubuntu-24.04-${{ env.ARCH_SUFFIX }}
       working-directory: "${{ github.workspace }}/build"
+
     - name: Release without changelog
       if: ${{ startsWith(github.ref, 'refs/tags/') && matrix.os != 'ubuntu-latest' }}
       uses: softprops/action-gh-release@v2
       with:
         draft: true
-        files: ${{ github.workspace }}/build/libsimple-linux-${{ matrix.os }}.zip
+        files: ${{ github.workspace }}/build/libsimple-ubuntu-24.04-${{ env.ARCH_SUFFIX }}.tar.gz
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     - name: Release
@@ -266,7 +164,7 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         draft: true
-        files: ${{ github.workspace }}/build/libsimple-${{ matrix.os }}.zip
+        files: ${{ github.workspace }}/build/libsimple-ubuntu-24.04-${{ env.ARCH_SUFFIX }}.tar.gz
         body: ${{steps.build_changelog.outputs.changelog}}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -351,10 +249,10 @@ jobs:
     - name: Package
       if: startsWith(github.ref, 'refs/tags/')
       run: |
-        mkdir libsimple-macos-x64
+        mkdir libsimple-darwin
         sudo xattr -r -d com.apple.quarantine src/libsimple.dylib
-        cp -r src/libsimple.dylib test/dict libsimple-macos-x64/
-        zip -r libsimple-macos-x64.zip libsimple-macos-x64
+        cp -r src/libsimple.dylib test/dict libsimple-darwin/
+        tar -czf libsimple-darwin.tar.gz libsimple-darwin
       working-directory: "${{ github.workspace }}/../../_temp/macos"
 
     - name: Release
@@ -362,7 +260,7 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         draft: true
-        files: "${{ github.workspace }}/../../_temp/macos/libsimple-macos-x64.zip"
+        files: "${{ github.workspace }}/../../_temp/macos/libsimple-darwin.tar.gz"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -370,64 +268,6 @@ jobs:
       if: success()
       run: ./build-ios.sh
 
-  # Linux_amd64:
-  #   runs-on: ubuntu-latest
-  #   strategy:
-  #       fail-fast: true
-  #       matrix:
-  #           build_type: [Release]
-  #   steps:
-  #   - name: Checkout code
-  #     uses: actions/checkout@v4
-  #     with:
-  #       fetch-depth: 0
-  #       submodules: true
-
-  #   - name: Build with Docker
-  #     run: |
-  #       docker build \
-  #           --build-arg BUILD_TYPE=${{matrix.build_type}} \
-  #           -t simple-builder -f Dockerfile .
-
-  #       mkdir -p ${{ github.workspace }}/build
-  #       BUILDER_CID=$(docker create simple-builder)
-  #       docker cp "${BUILDER_CID}:/output/." "${{ github.workspace }}/build/"
-  #       docker rm "${BUILDER_CID}"
-
-
-  #   - name: check file
-  #     run: |
-  #       echo "=== Directory structure ==="
-  #       find ${{ github.workspace }}/build -type f | sort
-  #       echo "=== Docker container output ==="
-  #       docker run --rm simple-builder ls -la /output
-
-  #   - name: Check file existence
-  #     uses: andstor/file-existence-action@v3
-  #     with:
-  #       allow_failure: true
-  #       files: "${{ github.workspace }}/build/libsimple-linux-amd64/libsimple.so, ${{ github.workspace }}/build/libsimple-linux-amd64/dict/jieba.dict.utf8"
-
-  #   - name: Package
-  #     if: startsWith(github.ref, 'refs/tags/')
-  #     run: |
-  #       zip -r libsimple-linux-amd64.zip libsimple-linux-amd64
-  #     working-directory: "${{ github.workspace }}/build"
-
-  #   - name: Release
-  #     if: startsWith(github.ref, 'refs/tags/')
-  #     uses: softprops/action-gh-release@v2
-  #     with:
-  #       token: ${{ secrets.GITHUB_TOKEN }}
-  #       draft: true
-  #       files: "${{ github.workspace }}/build/libsimple-linux-amd64.zip"
-
-  #   - name: Build Summary (amd64)
-  #     if: always()
-  #     run: |
-  #       echo "## Build Summary (amd64)" >> $GITHUB_STEP_SUMMARY
-  #       echo "- Build Type: ${{ matrix.build_type }}" >> $GITHUB_STEP_SUMMARY
-  #       echo "- OS: Linux (amd64) with Docker" >> $GITHUB_STEP_SUMMARY
   Linux_alpine:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -450,15 +290,6 @@ jobs:
         fetch-depth: 0
         submodules: true
 
-    - name: Create toolchain-alpine.cmake
-      run: |
-        echo "SET(CMAKE_SYSTEM_NAME Linux)" > toolchain-alpine.cmake
-        echo "SET(CMAKE_SYSTEM_PROCESSOR x86_64)" >> toolchain-alpine.cmake
-        echo "SET(CMAKE_C_COMPILER gcc)" >> toolchain-alpine.cmake
-        echo "SET(CMAKE_CXX_COMPILER g++)" >> toolchain-alpine.cmake
-        echo "SET(CMAKE_SHARED_LIBRARY_PREFIX \"lib\")" >> toolchain-alpine.cmake
-        echo "SET(CMAKE_SHARED_LIBRARY_SUFFIX \".so\")" >> toolchain-alpine.cmake
-
     - name: Build with Docker (Alpine ${{ env.arch }})
       run: |
         docker buildx build \
@@ -480,7 +311,7 @@ jobs:
     - name: Package (Alpine ${{ env.arch }})
       if: startsWith(github.ref, 'refs/tags/')
       run: |
-        zip -r libsimple-alpine-${{ env.arch }}.zip libsimple-alpine-${{ env.arch }}
+        tar -czf libsimple-alpine-${{ env.arch }}.tar.gz libsimple-alpine-${{ env.arch }}
       working-directory: "${{ github.workspace }}/build"
 
     - name: Release (Alpine ${{ env.arch }})
@@ -489,7 +320,7 @@ jobs:
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         draft: true
-        files: "${{ github.workspace }}/build/libsimple-alpine-${{ env.arch }}.zip"
+        files: "${{ github.workspace }}/build/libsimple-alpine-${{ env.arch }}.tar.gz"
 
     - name: Build Summary (Alpine ${{ env.arch }})
       if: always()
